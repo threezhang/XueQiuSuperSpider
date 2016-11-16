@@ -67,6 +67,10 @@ public class StockToLongHuBangMapper extends AbstractMapper <Stock, LongHuBangIn
         JsonNode buyListNode = detail.get("tqQtBizunittrdinfoBuyList");
         JsonNode saleListNode = detail.get("tqQtBizunittrdinfoSaleList");
 
+        JsonNode stockNode = detail.get("tqQtSkdailyprice");
+        String amount = stockNode.get("amount").asText();
+        stock.setAmount(amount);
+
         Set<LongHuBangInfo.BizsunitInfo> buyList = new HashSet<>();
         Set<LongHuBangInfo.BizsunitInfo> saleList = new HashSet<>();
 

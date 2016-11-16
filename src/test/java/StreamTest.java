@@ -1,6 +1,26 @@
+import jxl.Workbook;
+import jxl.format.Alignment;
+import jxl.format.Border;
+import jxl.format.BorderLineStyle;
+import jxl.format.Colour;
+import jxl.format.UnderlineStyle;
+import jxl.write.Label;
+import jxl.write.WritableCellFormat;
+import jxl.write.WritableFont;
+import jxl.write.WritableSheet;
+import jxl.write.WritableWorkbook;
+import jxl.write.WriteException;
 import mapperTest.TestCaseGenerator;
-import org.decaywood.collector.*;
-import org.decaywood.entity.*;
+import org.decaywood.collector.CommissionIndustryCollector;
+import org.decaywood.collector.DateRangeCollector;
+import org.decaywood.collector.HuShenNewsRefCollector;
+import org.decaywood.collector.MostProfitableCubeCollector;
+import org.decaywood.collector.StockScopeHotRankCollector;
+import org.decaywood.entity.Cube;
+import org.decaywood.entity.Entry;
+import org.decaywood.entity.Industry;
+import org.decaywood.entity.LongHuBangInfo;
+import org.decaywood.entity.Stock;
 import org.decaywood.entity.trend.StockTrend;
 import org.decaywood.filter.PageKeyFilter;
 import org.decaywood.mapper.cubeFirst.CubeToCubeWithLastBalancingMapper;
@@ -13,9 +33,20 @@ import org.decaywood.mapper.stockFirst.StockToStockWithStockTrendMapper;
 import org.decaywood.utils.MathUtils;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.URL;
 import java.rmi.RemoteException;
-import java.util.*;
+import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -36,7 +67,7 @@ public class StreamTest {
 
         Predicate<Entry<String, Stock>> predicate = x -> {
 
-            if(x.getValue().getStockTrend().getHistory().isEmpty()) return false;
+            if (x.getValue().getStockTrend().getHistory().isEmpty()) return false;
             List<StockTrend.TrendBlock> history = x.getValue().getStockTrend().getHistory();
             StockTrend.TrendBlock block = history.get(history.size() - 1);
             double close = Double.parseDouble(block.getClose());
@@ -119,7 +150,7 @@ public class StreamTest {
         Date from = calendar.getTime();
         calendar.set(2015, Calendar.NOVEMBER, 25);
         Date to = calendar.getTime();
-        MostProfitableCubeCollector cubeCollector = new MostProfitableCubeCollector( MostProfitableCubeCollector.Market.CN,
+        MostProfitableCubeCollector cubeCollector = new MostProfitableCubeCollector(MostProfitableCubeCollector.Market.CN,
                 MostProfitableCubeCollector.ORDER_BY.DAILY);
         CubeToCubeWithLastBalancingMapper mapper = null;
         try {
@@ -199,14 +230,13 @@ public class StreamTest {
     }
 
 
-
-    //游资追踪
+    //龙虎榜数据
     @Test
     public void LongHuBangTracking() throws RemoteException {
         Calendar calendar = Calendar.getInstance();
-        calendar.set(2015, Calendar.DECEMBER, 1);
+        calendar.set(2016, Calendar.NOVEMBER, 15);
         Date from = calendar.getTime();
-        calendar.set(2015, Calendar.DECEMBER, 7);
+        calendar.set(2016, Calendar.NOVEMBER, 15);
         Date to = calendar.getTime();
         DateRangeCollector collector = new DateRangeCollector(from, to);
         DateToLongHuBangStockMapper mapper = new DateToLongHuBangStockMapper();
@@ -215,13 +245,168 @@ public class StreamTest {
                 .parallelStream()
                 .map(mapper)
                 .flatMap(List::stream).map(mapper1)
-                .filter(x -> x.bizsunitInBuyList("溧阳路", true))
                 .sorted(Comparator.comparing(LongHuBangInfo::getDate))
                 .collect(Collectors.toList());
-        for (LongHuBangInfo info : s) {
-            System.out.println(info.getDate() + " -> " + info.getStock().getStockName());
+
+
+        String[] keyWords = new String[]{"淮海中路", "金田", "古北"};
+
+        SimpleDateFormat dt1 = new SimpleDateFormat("yyyy-MM-dd");
+
+        String file = "/Users/three/git-code/XueQiuSuperSpider/"+dt1.format(from) +"-longhubang.xls";
+        WritableWorkbook workbook = null;
+        try {
+            //创建工作薄
+            workbook = Workbook.createWorkbook(new File(file));
+            //创建新的一页
+            WritableSheet sheet = workbook.createSheet(dt1.format(from) + "-龙虎榜数据", 0);
+
+            //创建表头
+            createExcelHeader(from, sheet);
+
+            // 设置字体颜色，可以单独对WritableFont设置setColour(...)
+            WritableFont cf4 = new WritableFont(WritableFont.ARIAL, 12);
+            cf4.setUnderlineStyle(UnderlineStyle.DOUBLE);
+            cf4.setColour(Colour.RED);
+            // 设置单元格样式
+            WritableCellFormat format = new WritableCellFormat(cf4);
+            format.setBorder(Border.ALL, BorderLineStyle.DASH_DOT, Colour.RED);
+            format.setBackground(Colour.YELLOW);
+
+            int _index = 0;
+            int i = 0;
+            for (LongHuBangInfo info : s) {
+
+                Double totalAmount = Double.valueOf(info.getStock().getAmount());
+
+                if(totalAmount > 100000000) {
+                    _index++;
+                    i++;
+                    jxl.write.Number number = new jxl.write.Number(0, i, _index);
+                    sheet.addCell(number);
+                    Label tmp1 = new Label(1, i, info.getStock().getStockNo());
+                    sheet.addCell(tmp1);
+                    Label tmp2 = new Label(2, i, info.getStock().getStockName(), format);
+                    sheet.addCell(tmp2);
+
+                    Label tmp3 = new Label(3, i, String.format("%.2f", totalAmount / 10000), format);
+                    sheet.addCell(tmp3);
+
+                    //创建龙虎榜买家
+                    int _b = createBuyer(keyWords, sheet, format, i, info, totalAmount);
+                    //创建龙虎榜卖家
+                    int _s = createSale(keyWords, sheet, format, i, info, totalAmount);
+
+                    i = _b > _s ? ++_b : ++_s;
+                }
+            }
+
+            workbook.write();
+            workbook.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+
+        } finally {
+
         }
 
+
     }
+
+    private int createSale(String[] keyWords, WritableSheet sheet, WritableCellFormat format, int i, LongHuBangInfo info, Double totalAmount) throws WriteException {
+        int _s = i;
+        for(LongHuBangInfo.BizsunitInfo saleInfo :  info.getSortTopSaleList()) {
+            _s++;
+            String saleName = saleInfo.getBizsunitname();
+
+            boolean saleFlag = false;
+            for(String str : keyWords) {
+                if(saleName.contains(str)) {
+                    saleFlag = true;
+                }
+            }
+
+            Double saleAmount = Double.valueOf(saleInfo.getSaleamt());
+            String bNumberText = String.format("%.2f", saleAmount / 10000);
+            String saleRateText = String.format("%.2f", (saleAmount / totalAmount) * 100) + "%";
+
+            Label sLabel;
+            Label sNumber;
+            Label sRate;
+            if(saleFlag) {
+                sLabel = new Label(7, _s, saleName, format);
+                sNumber = new Label(8, _s, bNumberText, format);
+                sRate = new Label(9, _s, saleRateText, format);
+            } else {
+                sLabel = new Label(7, _s, saleName);
+                sNumber = new Label(8, _s, bNumberText);
+                sRate = new Label(9, _s, saleRateText);
+            }
+
+            sheet.addCell(sLabel);
+            sheet.addCell(sNumber);
+            sheet.addCell(sRate);
+        }
+        return _s;
+    }
+
+    private int createBuyer(String[] keyWords, WritableSheet sheet, WritableCellFormat format, int i, LongHuBangInfo info, Double totalAmount) throws WriteException {
+        int _b = i;
+        for(LongHuBangInfo.BizsunitInfo buyInfo :  info.getSortTopBuyList()) {
+            _b++;
+            String buyName = buyInfo.getBizsunitname();
+            boolean buyFlag = false;
+            for(String str : keyWords) {
+                if(buyName.contains(str)) {
+                    buyFlag = true;
+                }
+            }
+
+            Double buyAmount = Double.valueOf(buyInfo.getBuyamt());
+            String bNumberText = String.format("%.2f", buyAmount / 10000);
+            String buyRateText = String.format("%.2f", (buyAmount / totalAmount) * 100) + "%";
+
+            Label bLabel;
+            Label bNumber;
+            Label bRate;
+            if(buyFlag) {
+                bLabel = new Label(4, _b, buyName, format);
+                bNumber = new Label(5, _b, bNumberText, format);
+                bRate = new Label(6, _b, buyRateText, format);
+            }else {
+                bLabel = new Label(4, _b, buyName);
+                bNumber = new Label(5, _b, bNumberText);
+                bRate = new Label(6, _b, buyRateText);
+            }
+
+            sheet.addCell(bLabel);
+            sheet.addCell(bNumber);
+            sheet.addCell(bRate);
+        }
+        return _b;
+    }
+
+    private void createExcelHeader(Date from, WritableSheet sheet) throws WriteException {
+        jxl.write.DateTime date = new jxl.write.DateTime(0, 0, from);
+        sheet.addCell(date);
+        Label amount = new Label(3, 0, "成交总额(万)");
+        sheet.addCell(amount);
+        Label buybiz = new Label(4, 0, "买入营业部");
+        sheet.addCell(buybiz);
+        Label buy = new Label(5, 0, "买入金额(万)");
+        sheet.addCell(buy);
+        Label buyRate = new Label(6, 0, "买入占比");
+        sheet.addCell(buyRate);
+        Label salebiz = new Label(7, 0, "卖出营业部");
+        sheet.addCell(salebiz);
+        Label sale = new Label(8, 0, "卖出金额(万)");
+        sheet.addCell(sale);
+        Label saleRate = new Label(9, 0, "卖出占比");
+        sheet.addCell(saleRate);
+    }
+
 
 }

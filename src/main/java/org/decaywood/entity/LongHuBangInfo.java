@@ -3,8 +3,12 @@ package org.decaywood.entity;
 import org.decaywood.utils.StringUtils;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -18,6 +22,24 @@ public class LongHuBangInfo implements DeepCopy<LongHuBangInfo> {
 
     private final Set<BizsunitInfo> topBuyList;
     private final Set<BizsunitInfo> topSaleList;
+
+
+    class ComparatorBuy implements Comparator {
+        public int compare(Object arg0, Object arg1) {
+            BizsunitInfo biz0 = (BizsunitInfo) arg0;
+            BizsunitInfo biz1 = (BizsunitInfo) arg1;
+            return Double.valueOf(biz1.getBuyamt()).compareTo(Double.valueOf(biz0.getBuyamt()));
+        }
+    }
+
+    class ComparatorSale implements Comparator {
+        public int compare(Object arg0, Object arg1) {
+            BizsunitInfo biz0 = (BizsunitInfo) arg0;
+            BizsunitInfo biz1 = (BizsunitInfo) arg1;
+            return Double.valueOf(biz1.getSaleamt()).compareTo(Double.valueOf(biz0.getSaleamt()));
+        }
+    }
+
 
     public static class BizsunitInfo implements Serializable {
         private final String bizsunitcode; //营业部编号
@@ -73,6 +95,8 @@ public class LongHuBangInfo implements DeepCopy<LongHuBangInfo> {
         public int hashCode() {
             return bizsunitname.hashCode();
         }
+
+
     }
 
     public LongHuBangInfo(Stock stock, Date date, Set<BizsunitInfo> topBuyList, Set<BizsunitInfo> topSaleList) {
@@ -130,8 +154,43 @@ public class LongHuBangInfo implements DeepCopy<LongHuBangInfo> {
         return topBuyList;
     }
 
+    public List<BizsunitInfo> getSortTopBuyList() {
+        List<BizsunitInfo> list = new ArrayList<>();
+        ComparatorBuy comparator = new ComparatorBuy();
+        list.addAll(topBuyList);
+        Collections.sort(list, comparator);
+
+//        if(list.size() > 5) {
+//            List<BizsunitInfo> newList = new ArrayList<>();
+//            newList.add(list.get(0));
+//            newList.add(list.get(1));
+//            newList.add(list.get(2));
+//            newList.add(list.get(3));
+//            newList.add(list.get(4));
+//            return newList;
+//        }
+        return list;
+    }
+
     public Set<BizsunitInfo> getTopSaleList() {
         return topSaleList;
+    }
+
+    public List<BizsunitInfo> getSortTopSaleList() {
+        List<BizsunitInfo> list = new ArrayList<>();
+        ComparatorSale comparator = new ComparatorSale();
+        list.addAll(topSaleList);
+        Collections.sort(list, comparator);
+//        if(list.size() > 5) {
+//            List<BizsunitInfo> newList = new ArrayList<>();
+//            newList.add(list.get(0));
+//            newList.add(list.get(1));
+//            newList.add(list.get(2));
+//            newList.add(list.get(3));
+//            newList.add(list.get(4));
+//            return newList;
+//        }
+        return list;
     }
 
     @Override
