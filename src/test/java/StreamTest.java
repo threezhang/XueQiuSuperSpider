@@ -230,13 +230,28 @@ public class StreamTest {
     }
 
 
+    String[] goodSeats = new String[]{"中国中投证券有限责任公司宁波江东北路证券营业部",
+            "中国中投证券有限责任公司深圳沙井中心路证券营业部",
+            "中国银河证券股份有限公司宁波解放南路证券营业部",
+            "中信证券股份有限公司上海溧阳路证券营业部",
+            "光大证券股份有限公司深圳金田路证券营业部",
+            "光大证券股份有限公司上海淮海中路证券营业部",
+            "中信建投证券股份有限公司宜昌解放路证券营业部",
+            "招商证券股份有限公司深圳蛇口工业七路证券营业部"};
+
+    String[] badSeats = new String[]{"光大证券股份有限公司佛山季华六路证券营业部",
+            "华泰证券股份有限公司成都南一环路第二证券营业部",
+            "华泰证券股份有限公司深圳益田路荣超商务中心证券营业部",
+            "中国银河证券股份有限公司绍兴证券营业部",
+            "中信证券股份有限公司上海古北路证券营业部"};
+
     //龙虎榜数据
     @Test
     public void LongHuBangTracking() throws RemoteException {
         Calendar calendar = Calendar.getInstance();
-        calendar.set(2016, Calendar.NOVEMBER, 15);
+        calendar.set(2016, Calendar.DECEMBER, 13);
         Date from = calendar.getTime();
-        calendar.set(2016, Calendar.NOVEMBER, 15);
+        calendar.set(2016, Calendar.DECEMBER, 13);
         Date to = calendar.getTime();
         DateRangeCollector collector = new DateRangeCollector(from, to);
         DateToLongHuBangStockMapper mapper = new DateToLongHuBangStockMapper();
@@ -248,11 +263,7 @@ public class StreamTest {
                 .sorted(Comparator.comparing(LongHuBangInfo::getDate))
                 .collect(Collectors.toList());
 
-
-        String[] keyWords = new String[]{"淮海中路", "金田", "古北"};
-
         SimpleDateFormat dt1 = new SimpleDateFormat("yyyy-MM-dd");
-
         String file = "/Users/three/git-code/XueQiuSuperSpider/"+dt1.format(from) +"-longhubang.xls";
         WritableWorkbook workbook = null;
         try {
@@ -269,9 +280,14 @@ public class StreamTest {
             cf4.setUnderlineStyle(UnderlineStyle.DOUBLE);
             cf4.setColour(Colour.RED);
             // 设置单元格样式
-            WritableCellFormat format = new WritableCellFormat(cf4);
-            format.setBorder(Border.ALL, BorderLineStyle.DASH_DOT, Colour.RED);
-            format.setBackground(Colour.YELLOW);
+            WritableCellFormat goodFormat = new WritableCellFormat(cf4);
+            goodFormat.setBorder(Border.ALL, BorderLineStyle.DASH_DOT, Colour.RED);
+            goodFormat.setBackground(Colour.YELLOW);
+
+
+            WritableCellFormat badFormat = new WritableCellFormat(cf4);
+            badFormat.setBorder(Border.ALL, BorderLineStyle.DASH_DOT, Colour.RED);
+            badFormat.setBackground(Colour.LIGHT_GREEN);
 
             int _index = 0;
             int i = 0;
@@ -286,16 +302,16 @@ public class StreamTest {
                     sheet.addCell(number);
                     Label tmp1 = new Label(1, i, info.getStock().getStockNo());
                     sheet.addCell(tmp1);
-                    Label tmp2 = new Label(2, i, info.getStock().getStockName(), format);
+                    Label tmp2 = new Label(2, i, info.getStock().getStockName(), goodFormat);
                     sheet.addCell(tmp2);
 
-                    Label tmp3 = new Label(3, i, String.format("%.2f", totalAmount / 10000), format);
+                    Label tmp3 = new Label(3, i, String.format("%.2f", totalAmount / 10000), goodFormat);
                     sheet.addCell(tmp3);
 
                     //创建龙虎榜买家
-                    int _b = createBuyer(keyWords, sheet, format, i, info, totalAmount);
+                    int _b = createBuyer(sheet, goodFormat, badFormat, i, info, totalAmount);
                     //创建龙虎榜卖家
-                    int _s = createSale(keyWords, sheet, format, i, info, totalAmount);
+                    int _s = createSale(sheet, goodFormat, badFormat, i, info, totalAmount);
 
                     i = _b > _s ? ++_b : ++_s;
                 }
@@ -316,16 +332,24 @@ public class StreamTest {
 
     }
 
-    private int createSale(String[] keyWords, WritableSheet sheet, WritableCellFormat format, int i, LongHuBangInfo info, Double totalAmount) throws WriteException {
+    private int createSale(WritableSheet sheet, WritableCellFormat goodFormat, WritableCellFormat badFormat, int i, LongHuBangInfo info, Double totalAmount) throws WriteException {
         int _s = i;
         for(LongHuBangInfo.BizsunitInfo saleInfo :  info.getSortTopSaleList()) {
             _s++;
             String saleName = saleInfo.getBizsunitname();
 
-            boolean saleFlag = false;
-            for(String str : keyWords) {
+            boolean goodSaleFlag = false;
+            boolean badSaleFlag = false;
+
+            for(String str : goodSeats) {
                 if(saleName.contains(str)) {
-                    saleFlag = true;
+                    goodSaleFlag = true;
+                }
+            }
+
+            for(String str : badSeats) {
+                if(saleName.contains(str)) {
+                    badSaleFlag = true;
                 }
             }
 
@@ -336,11 +360,15 @@ public class StreamTest {
             Label sLabel;
             Label sNumber;
             Label sRate;
-            if(saleFlag) {
-                sLabel = new Label(7, _s, saleName, format);
-                sNumber = new Label(8, _s, bNumberText, format);
-                sRate = new Label(9, _s, saleRateText, format);
-            } else {
+            if(goodSaleFlag) {
+                sLabel = new Label(7, _s, saleName, goodFormat);
+                sNumber = new Label(8, _s, bNumberText, goodFormat);
+                sRate = new Label(9, _s, saleRateText, goodFormat);
+            }else if(badSaleFlag) {
+                sLabel = new Label(7, _s, saleName, badFormat);
+                sNumber = new Label(8, _s, bNumberText, badFormat);
+                sRate = new Label(9, _s, saleRateText, badFormat);
+            }else {
                 sLabel = new Label(7, _s, saleName);
                 sNumber = new Label(8, _s, bNumberText);
                 sRate = new Label(9, _s, saleRateText);
@@ -353,15 +381,23 @@ public class StreamTest {
         return _s;
     }
 
-    private int createBuyer(String[] keyWords, WritableSheet sheet, WritableCellFormat format, int i, LongHuBangInfo info, Double totalAmount) throws WriteException {
+    private int createBuyer(WritableSheet sheet, WritableCellFormat goodFormat, WritableCellFormat badFormat, int i, LongHuBangInfo info, Double totalAmount) throws WriteException {
         int _b = i;
         for(LongHuBangInfo.BizsunitInfo buyInfo :  info.getSortTopBuyList()) {
             _b++;
             String buyName = buyInfo.getBizsunitname();
-            boolean buyFlag = false;
-            for(String str : keyWords) {
+            boolean goodBuyFlag = false;
+            boolean badBuyFlag = false;
+
+            for(String str : goodSeats) {
                 if(buyName.contains(str)) {
-                    buyFlag = true;
+                    goodBuyFlag = true;
+                }
+            }
+
+            for(String str : badSeats) {
+                if(buyName.contains(str)) {
+                    badBuyFlag = true;
                 }
             }
 
@@ -372,10 +408,14 @@ public class StreamTest {
             Label bLabel;
             Label bNumber;
             Label bRate;
-            if(buyFlag) {
-                bLabel = new Label(4, _b, buyName, format);
-                bNumber = new Label(5, _b, bNumberText, format);
-                bRate = new Label(6, _b, buyRateText, format);
+            if(goodBuyFlag) {
+                bLabel = new Label(4, _b, buyName, goodFormat);
+                bNumber = new Label(5, _b, bNumberText, goodFormat);
+                bRate = new Label(6, _b, buyRateText, goodFormat);
+            }else if(badBuyFlag){
+                bLabel = new Label(4, _b, buyName, badFormat);
+                bNumber = new Label(5, _b, bNumberText, badFormat);
+                bRate = new Label(6, _b, buyRateText, badFormat);
             }else {
                 bLabel = new Label(4, _b, buyName);
                 bNumber = new Label(5, _b, bNumberText);

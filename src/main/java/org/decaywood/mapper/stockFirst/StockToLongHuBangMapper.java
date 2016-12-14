@@ -63,6 +63,9 @@ public class StockToLongHuBangMapper extends AbstractMapper <Stock, LongHuBangIn
 
     private LongHuBangInfo processNode(Stock stock, JsonNode node) {
 
+        if(stock.getStockName().equals("东北制药")) {
+            System.out.println();
+        }
         JsonNode detail = node.get("detail");
         JsonNode buyListNode = detail.get("tqQtBizunittrdinfoBuyList");
         JsonNode saleListNode = detail.get("tqQtBizunittrdinfoSaleList");
