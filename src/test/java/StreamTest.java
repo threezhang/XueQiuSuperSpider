@@ -1,3 +1,4 @@
+import entryFirst.UserInfoToDBAcceptor;
 import jxl.Workbook;
 import jxl.format.Alignment;
 import jxl.format.Border;
@@ -30,6 +31,7 @@ import org.decaywood.mapper.industryFirst.IndustryToStocksMapper;
 import org.decaywood.mapper.stockFirst.StockToLongHuBangMapper;
 import org.decaywood.mapper.stockFirst.StockToStockWithAttributeMapper;
 import org.decaywood.mapper.stockFirst.StockToStockWithStockTrendMapper;
+import org.decaywood.mapper.stockFirst.StockToVIPFollowerCountEntryMapper;
 import org.decaywood.utils.MathUtils;
 import org.junit.Test;
 
@@ -41,12 +43,17 @@ import java.net.URL;
 import java.rmi.RemoteException;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -123,12 +130,18 @@ public class StreamTest {
 
 
     //统计股票5000粉以上大V个数，并以行业分类股票 （耗时过长）
- /*   @Test
-    public void getStocksWithVipFollowersCount() {
+    @Test
+    public void getStocksWithVipFollowersCount() throws Exception {
         CommissionIndustryCollector collector = new CommissionIndustryCollector();//搜集所有行业
         IndustryToStocksMapper mapper = new IndustryToStocksMapper();//搜集每个行业所有股票
         StockToVIPFollowerCountEntryMapper mapper1 = new StockToVIPFollowerCountEntryMapper(5000, 300);//搜集每个股票的粉丝
         UserInfoToDBAcceptor acceptor = new UserInfoToDBAcceptor();//写入数据库
+
+
+        List<Industry> s = collector.get();
+
+
+        List<Long> longs = new ArrayList<>();
 
         List<Entry<Stock, Integer>> res = collector.get()
                 .parallelStream() //并行流
@@ -140,7 +153,7 @@ public class StreamTest {
         for (Entry<Stock, Integer> re : res) {
             System.out.println(re.getKey().getStockName() + " -> 5000粉丝以上大V个数  " + re.getValue());
         }
-    }*/
+    }
 
     //最赚钱组合最新持仓以及收益走势、大盘走势
     @Test
@@ -235,7 +248,7 @@ public class StreamTest {
             "中国银河证券股份有限公司宁波解放南路证券营业部",
             "中信证券股份有限公司上海溧阳路证券营业部",
             "光大证券股份有限公司深圳金田路证券营业部",
-            "光大证券股份有限公司上海淮海中路证券营业部",
+            "中信证券股份有限公司上海淮海中路证券营业部",
             "中信建投证券股份有限公司宜昌解放路证券营业部",
             "招商证券股份有限公司深圳蛇口工业七路证券营业部"};
 
@@ -245,13 +258,18 @@ public class StreamTest {
             "中国银河证券股份有限公司绍兴证券营业部",
             "中信证券股份有限公司上海古北路证券营业部"};
 
+
+
+
+
+
     //龙虎榜数据
     @Test
     public void LongHuBangTracking() throws RemoteException {
         Calendar calendar = Calendar.getInstance();
-        calendar.set(2016, Calendar.DECEMBER, 13);
+        calendar.set(2016, Calendar.DECEMBER, 19);
         Date from = calendar.getTime();
-        calendar.set(2016, Calendar.DECEMBER, 13);
+        calendar.set(2016, Calendar.DECEMBER, 19);
         Date to = calendar.getTime();
         DateRangeCollector collector = new DateRangeCollector(from, to);
         DateToLongHuBangStockMapper mapper = new DateToLongHuBangStockMapper();
@@ -446,6 +464,164 @@ public class StreamTest {
         sheet.addCell(sale);
         Label saleRate = new Label(9, 0, "卖出占比");
         sheet.addCell(saleRate);
+    }
+
+    @Test
+    public void OneLongHuBangTracking() throws RemoteException {
+        String name = "上海凤凰";
+
+        Map<String, Double> buy = new HashMap<>();
+        Map<String, Double> sale = new HashMap<>();
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(2016, Calendar.DECEMBER, 5);
+        Date from = calendar.getTime();
+        calendar.set(2016, Calendar.DECEMBER, 19);
+        Date to = calendar.getTime();
+
+        Date from1 = sortMap(from, to, name, buy, sale);
+        String file = "/Users/three/git-code/XueQiuSuperSpider/"+name +"-longhubang.xls";
+        genOneExcel(name, buy, sale, from1, file);
+
+    }
+
+    private void genOneExcel(String name, Map<String, Double> buy, Map<String, Double> sale, Date from, String file) {
+        WritableWorkbook workbook = null;
+        try {
+            // 设置字体颜色，可以单独对WritableFont设置setColour(...)
+            WritableFont cf4 = new WritableFont(WritableFont.ARIAL, 12);
+            cf4.setUnderlineStyle(UnderlineStyle.DOUBLE);
+            cf4.setColour(Colour.RED);
+            // 设置单元格样式
+            WritableCellFormat goodFormat = new WritableCellFormat(cf4);
+            goodFormat.setBorder(Border.ALL, BorderLineStyle.DASH_DOT, Colour.RED);
+            goodFormat.setBackground(Colour.YELLOW);
+
+
+            WritableCellFormat badFormat = new WritableCellFormat(cf4);
+            badFormat.setBorder(Border.ALL, BorderLineStyle.DASH_DOT, Colour.RED);
+            badFormat.setBackground(Colour.LIGHT_GREEN);
+
+
+            //创建工作薄
+            workbook = Workbook.createWorkbook(new File(file));
+            //创建新的一页
+            WritableSheet sheet = workbook.createSheet(name + "-龙虎榜数据", 0);
+
+            //创建表头
+            jxl.write.DateTime date = new jxl.write.DateTime(0, 0, from);
+
+            sheet.addCell(date);
+            Label gzName = new Label(1, 0, "股票");
+            sheet.addCell(gzName);
+            Label buybiz = new Label(2, 0, "营业部");
+            sheet.addCell(buybiz);
+            Label buyCell = new Label(3, 0, "买入金额(万)");
+            sheet.addCell(buyCell);
+            Label saleCell = new Label(4, 0, "卖出金额(万)");
+            sheet.addCell(saleCell);
+            Label diff = new Label(5, 0, "买入差值");
+            sheet.addCell(diff);
+
+
+            Label tmp1 = new Label(1, 1, name);
+            sheet.addCell(tmp1);
+
+            int i = 1;
+            for(Map.Entry<String, Double> entry : buy.entrySet()) {
+                String bizName = entry.getKey();
+                Double amount = entry.getValue();
+
+                Label tmp2;
+                if(Arrays.asList(goodSeats).contains(bizName)) {
+                    tmp2 = new Label(2, i, bizName, goodFormat);
+                }else if(Arrays.asList(badSeats).contains(bizName)) {
+                    tmp2 = new Label(2, i, bizName, badFormat);
+                }else {
+                    tmp2 = new Label(2, i, bizName);
+                }
+                sheet.addCell(tmp2);
+
+                jxl.write.Number tmp3 = new jxl.write.Number(3, i, amount);
+                sheet.addCell(tmp3);
+
+                Double saleAmount = null == sale.get(bizName) ? 0.0 : sale.get(bizName);
+                jxl.write.Number tmp4 = new jxl.write.Number(4, i, saleAmount);
+                sheet.addCell(tmp4);
+
+                jxl.write.Number tmp5 = new jxl.write.Number(5, i, Double.valueOf(String.format("%.2f", amount - saleAmount)));
+                sheet.addCell(tmp5);
+                i++;
+            }
+
+
+            workbook.write();
+            workbook.close();
+
+
+        }catch (Exception e) {
+
+        }
+    }
+
+    private Date sortMap(Date from, Date to, String name, Map<String, Double> buy, Map<String, Double> sale) throws RemoteException {
+
+        DateRangeCollector collector = new DateRangeCollector(from, to);
+        DateToLongHuBangStockMapper mapper = new DateToLongHuBangStockMapper();
+        StockToLongHuBangMapper mapper1 = new StockToLongHuBangMapper();
+        List<LongHuBangInfo> s = collector.get()
+                .parallelStream()
+                .map(mapper)
+                .flatMap(List::stream).map(mapper1)
+                .sorted(Comparator.comparing(LongHuBangInfo::getDate))
+                .collect(Collectors.toList());
+
+        for(LongHuBangInfo longHuBangInfo : s) {
+            String stockName = longHuBangInfo.getStock().getStockName();
+            if(stockName.equals(name)) {
+                List<LongHuBangInfo.BizsunitInfo> topBuy = longHuBangInfo.getSortTopBuyList();
+                List<LongHuBangInfo.BizsunitInfo> topSale = longHuBangInfo.getSortTopSaleList();
+
+                for(LongHuBangInfo.BizsunitInfo bizsunitInfo : topBuy) {
+                    String bizName = bizsunitInfo.getBizsunitname();
+                    Double buyAmt = Double.valueOf(String.format("%.2f", Double.valueOf(bizsunitInfo.getBuyamt()) / 10000));
+
+                    if(null == buy.get(bizName)) {
+                        buy.put(bizName, buyAmt);
+                    }else {
+                        buy.put(bizName, buy.get(bizName) + buyAmt);
+                    }
+                }
+
+                for(LongHuBangInfo.BizsunitInfo bizsunitInfo : topSale) {
+                    String bizName = bizsunitInfo.getBizsunitname();
+                    Double saleAmt = Double.valueOf(String.format("%.2f", Double.valueOf(bizsunitInfo.getSaleamt()) / 10000));
+                    if(null == sale.get(bizName)) {
+                        sale.put(bizName, saleAmt);
+                    }else {
+                        sale.put(bizName, sale.get(bizName) + saleAmt);
+                    }
+                }
+            }
+        }
+
+        List<Map.Entry<String, Double>> buyinfos = new ArrayList<Map.Entry<String, Double>>(buy.entrySet());
+        // 对HashMap中的key 进行排序
+        Collections.sort(buyinfos, new Comparator<Map.Entry<String, Double>>() {
+            public int compare(Map.Entry<String, Double> o1,
+                               Map.Entry<String, Double> o2) {
+                return (o2.getValue()).compareTo(o1.getValue());
+            }
+        });
+
+        List<Map.Entry<String, Double>> saleinfos = new ArrayList<Map.Entry<String, Double>>(sale.entrySet());
+        // 对HashMap中的key 进行排序
+        Collections.sort(saleinfos, new Comparator<Map.Entry<String, Double>>() {
+            public int compare(Map.Entry<String, Double> o1,
+                               Map.Entry<String, Double> o2) {
+                return (o2.getValue()).compareTo(o1.getValue());
+            }
+        });
+        return from;
     }
 
 
